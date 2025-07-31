@@ -2,6 +2,7 @@
 package com.example.assiproject;
 
 public class UserSession {
+    private boolean showNameInDialogs;
     private static UserSession instance;
     private String username;
     private boolean isGuest;
@@ -33,5 +34,12 @@ public class UserSession {
 
     public boolean isGuest() {
         return isGuest;
+    }
+    public boolean isShowNameInDialogs() {
+        return showNameInDialogs;
+    }
+
+    public void setShowNameInDialogs(boolean showNameInDialogs) {
+        this.showNameInDialogs = showNameInDialogs;
     }
 }

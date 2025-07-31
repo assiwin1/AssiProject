@@ -5,6 +5,11 @@
     android:orientation="vertical"
     android:gravity="center">
 
+    <ImageView
+        android:id="@+id/mainProfileImageView"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:src="@drawable/profile" /> <!-- Default placeholder -->
     <!-- Add this TextView at the top of your layout -->
     <TextView
         android:id="@+id/tvUserStatus"
@@ -13,6 +18,7 @@
         android:text="User status"
         android:textSize="18sp"
         android:layout_margin="16dp"/>
+
     <Button
         android:id="@+id/btnLogin"
         android:layout_width="wrap_content"
