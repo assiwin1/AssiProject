@@ -1,11 +1,15 @@
 package com.example.assiproject;
 
+import static android.text.InputType.TYPE_CLASS_TEXT;
+import static android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD;
+
 import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -72,29 +76,31 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showSubscribeDialog(UserDatabaseHelper dbHelper) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+
         EditText username = new EditText(this);
         username.setHint("Username");
+        layout.addView(username);
+
         EditText password = new EditText(this);
         password.setHint("Password");
-        password.setInputType(0x00000081);
+        password.setInputType(TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(password);
+
+        EditText email = new EditText(this);
+        email.setHint("Email");
+        layout.addView(email);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Subscribe")
-                .setView(username)
-                .setPositiveButton("Next", (d, w) -> {
-                    AlertDialog passDialog = new AlertDialog.Builder(this)
-                            .setTitle("Password")
-                            .setView(password)
-                            .setPositiveButton("Register", (d2, w2) -> {
-                                if (register(dbHelper, username.getText().toString(), password.getText().toString())) {
-                                    Toast.makeText(this, "Registration successful", Toast.LENGTH_SHORT).show();
-                                } else {
-                                    Toast.makeText(this, "User exists", Toast.LENGTH_SHORT).show();
-                                }
-                            })
-                            .setNegativeButton("Cancel", null)
-                            .create();
-                    passDialog.show();
+                .setView(layout)
+                .setPositiveButton("Register", (d, w) -> {
+                    if (register(dbHelper, username.getText().toString(), password.getText().toString(), email.getText().toString())) {
+                        Toast.makeText(this, "Registration successful", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, "User exists", Toast.LENGTH_SHORT).show();
+                    }
                 })
                 .setNegativeButton("Cancel", null)
                 .create();
@@ -109,11 +115,12 @@ public class MainActivity extends AppCompatActivity {
         return result;
     }
 
-    private boolean register(UserDatabaseHelper dbHelper, String username, String password) {
+    private boolean register(UserDatabaseHelper dbHelper, String username, String password, String email) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put("username", username);
         values.put("password", password);
+        values.put("email", email);
         try {
             db.insertOrThrow("users", null, values);
             return true;
