@@ -5,8 +5,9 @@ public class UserSession {
     private boolean showNameInDialogs;
     private static UserSession instance;
     private String username;
+    private String userEmail;
     private boolean isGuest;
-
+    private String userImageUri;
     private UserSession() {
         isGuest = true; // Default to guest
     }
@@ -22,13 +23,12 @@ public class UserSession {
         this.username = username;
         this.isGuest = false;
     }
-
     public void logout() {
         this.username = null;
         this.isGuest = true;
     }
 
-    public String getUsername() {
+    public String getUserName() {
         return username;
     }
 
@@ -41,5 +41,17 @@ public class UserSession {
 
     public void setShowNameInDialogs(boolean showNameInDialogs) {
         this.showNameInDialogs = showNameInDialogs;
+    }
+    public String getUserEmail() {
+        return userEmail;
+    }
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
+    public String getUserImageUri() {
+        return userImageUri;
+    }
+    public void setUserImageUri(String uri) {
+        this.userImageUri = uri;
     }
 }

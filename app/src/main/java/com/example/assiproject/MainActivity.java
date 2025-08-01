@@ -5,11 +5,10 @@ import static android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD;
 
 import android.app.AlertDialog;
 import android.content.ContentValues;
+import android.content.Context; // Added for SharedPreferences in login
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -23,17 +22,17 @@ import android.widget.Button;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import android.widget.CheckBox;
-
+import android.util.Log; // This was already present
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "UserTodoDebug"; // <<< ADDED TAG DEFINITION
+
     private static final int REQUEST_CAMERA = 1;
     private static final int REQUEST_GALLERY = 2;
     private String currentPhotoPath;
@@ -54,38 +53,64 @@ public class MainActivity extends AppCompatActivity {
 
         findViewById(R.id.btnLogin).setOnClickListener(v -> showLoginDialog(dbHelper));
         findViewById(R.id.btnSubscribe).setOnClickListener(v -> showSubscribeDialog(dbHelper));
-        currentDialogProfileImageView = findViewById(R.id.mainProfileImageView);
-        tvUserStatus = findViewById(R.id.tvUserStatus);
-        if (UserSession.getInstance().isGuest()) {
-            tvUserStatus.setText("Please login or subscribe");
-        } else {
-            tvUserStatus.setText("Welcome, " + UserSession.getInstance().getUsername());
-        }
-        updateUserStatusAndImage();
+        currentDialogProfileImageView = findViewById(R.id.mainProfileImageView); // This is for the main view initial setup
+        tvUserStatus = findViewById(R.id.tvUserStatus); // This is for the main view initial setup
+        
+        updateUserStatusAndImage(); 
     }
-    private void updateUserStatusAndImage() {
-        if (UserSession.getInstance().isGuest()) {
-            tvUserStatus.setText("Please login or subscribe");
-            currentDialogProfileImageView.setImageResource(R.drawable.profile); // Default image
-            currentDialogProfileImageView.setVisibility(View.VISIBLE); // Or View.GONE if you prefer no image for guests
-        } else {
-            String username = UserSession.getInstance().getUsername();
-            boolean showUserDetailsPref = getSharedPreferences("user_prefs", MODE_PRIVATE)
-                    .getBoolean("show_username_" + username, true); // User-specific key
 
-            if (showUserDetailsPref) {
-                tvUserStatus.setText("Welcome, " + username);
-                loadProfileImageForUser(username, currentDialogProfileImageView); // Load the specific user's image
-                currentDialogProfileImageView.setVisibility(View.VISIBLE);     // Make sure image view is visible
-            } else {
-                tvUserStatus.setText("Welcome (User details hidden)");
-                currentDialogProfileImageView.setImageResource(R.drawable.profile); // Set to a generic/default image
-                // Or hide it completely if preferred when details are hidden:
-                // mainProfileImageView.setVisibility(View.GONE);
-                // If you choose to hide it, make sure to set it to VISIBLE when showUserDetailsPref is true.
-            }
+private void updateUserStatusAndImage() {
+    ImageView mainActivityProfileImageView = findViewById(R.id.mainProfileImageView);
+    TextView mainTvUserStatus = findViewById(R.id.tvUserStatus);
+
+    if (mainActivityProfileImageView == null || mainTvUserStatus == null) {
+        if (!UserSession.getInstance().isGuest()) {
+            String username = UserSession.getInstance().getUserName();
+            // <<< ADDED Log.d
+            Log.d(TAG, "MainActivity - updateUserStatusAndImage (views missing): Setting LOGGED_IN_USER_ID_KEY to: " + username); 
+            getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE)
+                    .edit()
+                    .putString(TodoFragment.LOGGED_IN_USER_ID_KEY, username)
+                    .apply();
+            Intent intent = new Intent(MainActivity.this, LandingActivity.class);
+            startActivity(intent);
+            finish();
         }
+        return; 
     }
+
+    if (UserSession.getInstance().isGuest()) {
+        mainTvUserStatus.setText("Please login or subscribe");
+        mainActivityProfileImageView.setImageResource(R.drawable.profile); 
+        mainActivityProfileImageView.setVisibility(View.VISIBLE);
+    } else {
+        String username = UserSession.getInstance().getUserName();
+        boolean showUserDetailsPref = getSharedPreferences("user_prefs", MODE_PRIVATE)
+                .getBoolean("show_username_" + username, true);
+
+        if (showUserDetailsPref) {
+            mainTvUserStatus.setText("Welcome, " + username);
+            loadProfileImageForUser(username, mainActivityProfileImageView);
+            mainActivityProfileImageView.setVisibility(View.VISIBLE);
+        } else {
+            mainTvUserStatus.setText("Welcome (User details hidden)");
+            mainActivityProfileImageView.setImageResource(R.drawable.profile);
+            mainActivityProfileImageView.setVisibility(View.VISIBLE); 
+        }
+        
+        // <<< ADDED Log.d
+        Log.d(TAG, "MainActivity - updateUserStatusAndImage: Setting LOGGED_IN_USER_ID_KEY to: " + username);
+        getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE)
+                .edit()
+                .putString(TodoFragment.LOGGED_IN_USER_ID_KEY, username)
+                .apply();
+
+        Intent intent = new Intent(MainActivity.this, LandingActivity.class);
+        startActivity(intent);
+        finish(); 
+    }
+}
+
     private void loadProfileImageForUser(String username, ImageView imageViewToUpdate) {
         if (username == null || imageViewToUpdate == null) {
             if (imageViewToUpdate != null) {
@@ -99,7 +124,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         String path = getSharedPreferences("user_prefs", MODE_PRIVATE)
-                .getString("profile_image_path_" + username, null); // User-specific
+                .getString("profile_image_path_" + username, null); 
         if (path != null) {
             imageViewToUpdate.setImageURI(Uri.parse(path));
         } else {
@@ -117,16 +142,18 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
     private void openCamera() {
-        String username = UserSession.getInstance().getUsername();
-        if (username == null) {
+        String username = UserSession.getInstance().getUserName(); 
+        if (username == null && currentDialogProfileImageView == findViewById(R.id.mainProfileImageView) ) { 
             Toast.makeText(this, "Login required for camera photo", Toast.LENGTH_SHORT).show();
-            return;
+            return; 
         }
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        File photoFile = new File(getFilesDir(), username + ".jpg");
+        String tempFileName = (username != null) ? username + ".jpg" : "temp_profile_pic.jpg";
+        File photoFile = new File(getFilesDir(), tempFileName);
+
         Uri photoURI = FileProvider.getUriForFile(this, getPackageName() + ".provider", photoFile);
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         intent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
-        currentPhotoPath = photoFile.getAbsolutePath();
+        currentPhotoPath = photoFile.getAbsolutePath(); 
         startActivityForResult(intent, REQUEST_CAMERA);
     }
     private void openGallery() {
@@ -137,188 +164,204 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode == RESULT_OK) {
+            Uri imageUri = null;
             if (requestCode == REQUEST_CAMERA) {
-                if (currentDialogProfileImageView != null && currentDialogRequestCode == REQUEST_CAMERA) {
-                    currentDialogProfileImageView.setImageURI(Uri.fromFile(new File(currentPhotoPath)));
-                } else if (currentDialogProfileImageView != null) {
-                    currentDialogProfileImageView.setImageURI(Uri.fromFile(new File(currentPhotoPath)));
-                    getSharedPreferences("user_prefs", MODE_PRIVATE)
-                            .edit()
-                            .remove("profile_image_path")
-                            .apply();
-                }
+                imageUri = Uri.fromFile(new File(currentPhotoPath));
             } else if (requestCode == REQUEST_GALLERY && data != null) {
-                Uri selectedImage = data.getData();
-                if (currentDialogProfileImageView != null && currentDialogRequestCode == REQUEST_GALLERY) {
-                    currentDialogProfileImageView.setImageURI(selectedImage);
-                } else if (currentDialogProfileImageView != null) {
-                    currentDialogProfileImageView.setImageURI(selectedImage);
-                    getSharedPreferences("user_prefs", MODE_PRIVATE)
-                            .edit()
-                            .putString("profile_image_path", selectedImage.toString())
-                            .apply();
+                imageUri = data.getData();
+            }
+
+            if (imageUri != null && currentDialogProfileImageView != null) {
+                currentDialogProfileImageView.setImageURI(imageUri);
+                if (currentDialogProfileImageView != findViewById(R.id.mainProfileImageView)) {
+                    currentDialogProfileImageView.setTag(imageUri.toString());
+                    if (requestCode == REQUEST_CAMERA) {
+                        currentDialogProfileImageView.setTag(R.id.tag_camera_path, currentPhotoPath);
+                    }
                 }
             }
-            // Reset dialog tracking
-            currentDialogProfileImageView = null;
-            currentDialogRequestCode = -1;
-        }
-    }
-    private void loadProfileImage() {
-        String username = UserSession.getInstance().getUsername();
-        if (username != null) {
-            File photoFile = new File(getFilesDir(), username + ".jpg");
-            if (photoFile.exists()) {
-                currentDialogProfileImageView.setImageURI(Uri.fromFile(photoFile));
-                return;
+            if (requestCode == REQUEST_CAMERA && currentDialogProfileImageView == findViewById(R.id.mainProfileImageView)) {
+                 getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
+                         .remove("profile_image_path_" + UserSession.getInstance().getUserName()) 
+                         .apply(); 
+            } else if (requestCode == REQUEST_GALLERY && data != null && currentDialogProfileImageView == findViewById(R.id.mainProfileImageView)) {
+                 getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
+                         .putString("profile_image_path_" + UserSession.getInstance().getUserName(), data.getData().toString())
+                         .apply();
+            }
+
+            if(currentDialogProfileImageView != findViewById(R.id.mainProfileImageView)){
             }
         }
-        String path = getSharedPreferences("user_prefs", MODE_PRIVATE)
-                .getString("profile_image_path", null);
-        if (path != null) {
-            currentDialogProfileImageView.setImageURI(Uri.parse(path));
-        } else {
-            currentDialogProfileImageView.setImageResource(R.drawable.profile);
-        }
     }
+
     private void showLoginDialog(UserDatabaseHelper dbHelper) {
-        // --- First Dialog (Username) ---
-        // Create a container for the username dialog if you want more than just the EditText
         LinearLayout usernameDialogLayout = new LinearLayout(this);
         usernameDialogLayout.setOrientation(LinearLayout.VERTICAL);
-        int paddingInDp = 16; // Add some padding
+        int paddingInDp = 16;
         float scale = getResources().getDisplayMetrics().density;
         int paddingInPx = (int) (paddingInDp * scale + 0.5f);
         usernameDialogLayout.setPadding(paddingInPx, paddingInPx, paddingInPx, paddingInPx);
 
-        // Optional: Add profile image and "Change Picture" to this specific dialog's layout
         ImageView usernameDialogProfileImage = new ImageView(this);
         usernameDialogProfileImage.setImageResource(R.drawable.profile);
-        // Add LayoutParams for usernameDialogProfileImage if needed
+        LinearLayout.LayoutParams imageParamsDialog = new LinearLayout.LayoutParams(
+                200, 200 
+        );
+        imageParamsDialog.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        imageParamsDialog.bottomMargin = paddingInPx / 2;
+        usernameDialogProfileImage.setLayoutParams(imageParamsDialog);
         usernameDialogLayout.addView(usernameDialogProfileImage);
 
         Button btnChangeUsernameDialogPicture = new Button(this);
         btnChangeUsernameDialogPicture.setText("Change Picture");
+        LinearLayout.LayoutParams buttonParamsDialog = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        buttonParamsDialog.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        buttonParamsDialog.bottomMargin = paddingInPx;
+        btnChangeUsernameDialogPicture.setLayoutParams(buttonParamsDialog);
         usernameDialogLayout.addView(btnChangeUsernameDialogPicture);
+
 
         final EditText usernameEditText = new EditText(this);
         usernameEditText.setHint("Username");
         usernameDialogLayout.addView(usernameEditText);
 
         btnChangeUsernameDialogPicture.setOnClickListener(v -> {
-            currentDialogProfileImageView = usernameDialogProfileImage; // Set the target for onActivityResult
-            showPictureDialog(); // Your existing method to show camera/gallery options
+            currentDialogProfileImageView = usernameDialogProfileImage;
+            currentDialogRequestCode = REQUEST_CAMERA; 
+            showPictureDialog();
         });
 
 
         new AlertDialog.Builder(this)
                 .setTitle("Login - Step 1: Username")
-                .setView(usernameDialogLayout) // Set the whole layout for this dialog
+                .setView(usernameDialogLayout)
                 .setPositiveButton("Next", (dialog, which) -> {
-                    // --- Second Dialog (Password) ---
+                    String usernameFromDialog = usernameEditText.getText().toString().trim(); // Renamed to avoid conflict
+
                     LinearLayout passwordDialogLayout = new LinearLayout(this);
                     passwordDialogLayout.setOrientation(LinearLayout.VERTICAL);
-                    passwordDialogLayout.setPadding(paddingInPx, paddingInPx, paddingInPx, paddingInPx); // Optional padding
+                    passwordDialogLayout.setPadding(paddingInPx, paddingInPx, paddingInPx, paddingInPx);
 
-                    final EditText passwordEditText = new EditText(this); // Create a NEW EditText for password
+                    final EditText passwordEditText = new EditText(this);
                     passwordEditText.setHint("Password");
                     passwordEditText.setInputType(TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_PASSWORD);
                     passwordDialogLayout.addView(passwordEditText);
 
-                    new AlertDialog.Builder(MainActivity.this) // Use MainActivity.this for context
+                    new AlertDialog.Builder(MainActivity.this)
                             .setTitle("Login - Step 2: Password")
-                            .setView(passwordDialogLayout) // Set the password layout
+                            .setView(passwordDialogLayout)
                             .setPositiveButton("Login", (d2, w2) -> {
-                                String username = usernameEditText.getText().toString().trim();
-                                String password = passwordEditText.getText().toString().trim();
+                                String enteredUsername = usernameEditText.getText().toString().trim(); 
+                                String enteredPassword = passwordEditText.getText().toString().trim();
 
-                                if (username.isEmpty() || password.isEmpty()) {
+                                if (enteredUsername.isEmpty() || enteredPassword.isEmpty()) {
                                     Toast.makeText(MainActivity.this, "Username and password cannot be empty", Toast.LENGTH_SHORT).show();
                                     return;
                                 }
 
-                                if (authenticate(dbHelper, username, password)) {
-                                    UserSession.getInstance().login(username);
-                                    updateUserStatusAndImage(); // Your method to update UI
+                                if (authenticate(dbHelper, enteredUsername, enteredPassword)) {
+                                    UserSession.getInstance().login(enteredUsername);
+                                    String email = dbHelper.getEmailByUsername(enteredUsername);
+                                    UserSession.getInstance().setUserEmail(email);
+
+                                    // <<< ADDED Log.d
+                                    Log.d(TAG, "MainActivity - Login: Setting LOGGED_IN_USER_ID_KEY to: " + enteredUsername);
+                                    getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE) 
+                                            .edit()
+                                            .putString(TodoFragment.LOGGED_IN_USER_ID_KEY, enteredUsername) 
+                                            .apply();
+                                    
+                                    if (usernameDialogProfileImage.getTag() != null && currentDialogProfileImageView == usernameDialogProfileImage) {
+                                         if (usernameDialogProfileImage.getTag(R.id.tag_camera_path) != null) {
+                                            String cameraPath = (String) usernameDialogProfileImage.getTag(R.id.tag_camera_path);
+                                            File photoFile = new File(cameraPath);
+                                            File newFile = new File(getFilesDir(), enteredUsername + ".jpg");
+                                            if (newFile.exists()) newFile.delete();
+                                            photoFile.renameTo(newFile);
+                                            getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
+                                                    .remove("profile_image_path_" + enteredUsername).apply();
+                                        } else {
+                                            String imageUriString = (String) usernameDialogProfileImage.getTag();
+                                             getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
+                                                    .putString("profile_image_path_" + enteredUsername, imageUriString).apply();
+                                        }
+                                    }
+                                    updateUserStatusAndImage();
                                     Toast.makeText(MainActivity.this, "Login successful", Toast.LENGTH_SHORT).show();
                                 } else {
                                     Toast.makeText(MainActivity.this, "Invalid credentials", Toast.LENGTH_SHORT).show();
                                 }
+                                currentDialogProfileImageView = null;
+                                currentPhotoPath = null;
+                                currentDialogRequestCode = -1;
                             })
-                            .setNegativeButton("Cancel", null)
-                            .show(); // Show the password dialog
+                            .setNegativeButton("Cancel", (d,w) -> {
+                                currentDialogProfileImageView = null;
+                                currentPhotoPath = null;
+                                currentDialogRequestCode = -1;
+                            })
+                            .show();
                 })
-                .setNegativeButton("Cancel", null)
-                .show(); // Show the username dialog
+                .setNegativeButton("Cancel", (d,w) -> {
+                    currentDialogProfileImageView = null;
+                    currentPhotoPath = null;
+                    currentDialogRequestCode = -1;
+                })
+                .show();
     }
-
-
-
 
     private void showSubscribeDialog(UserDatabaseHelper dbHelper) {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
 
-        // Add some padding to the layout
         int paddingInDp = 16;
         float scale = getResources().getDisplayMetrics().density;
         int paddingInPx = (int) (paddingInDp * scale + 0.5f);
         layout.setPadding(paddingInPx, paddingInPx, paddingInPx, paddingInPx);
 
-        // 1. Profile Image for this dialog
         ImageView dialogProfileImage = new ImageView(this);
-        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
+        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(200, 200);
         imageParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-        imageParams.width = 200; // Example size
-        imageParams.height = 200; // Example size
         imageParams.bottomMargin = paddingInPx / 2;
         dialogProfileImage.setLayoutParams(imageParams);
-        dialogProfileImage.setImageResource(R.drawable.profile); // Default image
+        dialogProfileImage.setImageResource(R.drawable.profile);
         layout.addView(dialogProfileImage);
 
-        // 2. "Change Picture" Button for this dialog
         Button btnChangePicture = new Button(this);
         btnChangePicture.setText("Change Picture");
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
+                LinearLayout.LayoutParams.WRAP_CONTENT);
         buttonParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
         buttonParams.bottomMargin = paddingInPx;
         btnChangePicture.setLayoutParams(buttonParams);
         layout.addView(btnChangePicture);
 
-        // 3. Username EditText
-        EditText usernameEditText = new EditText(this); // Renamed for clarity
+        EditText usernameEditText = new EditText(this);
         usernameEditText.setHint("Username");
         layout.addView(usernameEditText);
 
-        // 4. Password EditText
-        EditText passwordEditText = new EditText(this); // Renamed for clarity
+        EditText passwordEditText = new EditText(this);
         passwordEditText.setHint("Password");
         passwordEditText.setInputType(TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_PASSWORD);
         layout.addView(passwordEditText);
 
-        // 5. Email EditText
-        EditText emailEditText = new EditText(this); // Renamed for clarity
+        EditText emailEditText = new EditText(this);
         emailEditText.setHint("Email");
         layout.addView(emailEditText);
 
-        // 6. Show Username CheckBox
         CheckBox showUsernameCheckbox = new CheckBox(this);
         showUsernameCheckbox.setText("Show username in all application windows");
         layout.addView(showUsernameCheckbox);
 
-        // >>>>>>> FIX: ADD OnClickListener for the Change Picture button <<<<<<<
         btnChangePicture.setOnClickListener(v -> {
-            // When "Change Picture" in THIS dialog is clicked,
-            // set currentDialogProfileImageView to THIS dialog's ImageView.
             currentDialogProfileImageView = dialogProfileImage;
-            currentDialogRequestCode = -1; // Reset or set a specific code if needed for subscribe dialog context
-            showPictureDialog(); // Your existing method to show camera/gallery options
+            currentDialogRequestCode = -1; 
+            showPictureDialog();
         });
 
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -331,72 +374,54 @@ public class MainActivity extends AppCompatActivity {
 
                     if (usernameStr.isEmpty() || passwordStr.isEmpty() || emailStr.isEmpty()) {
                         Toast.makeText(MainActivity.this, "All fields are required", Toast.LENGTH_SHORT).show();
-                        return; // Don't dismiss
+                        return;
                     }
 
                     if (register(dbHelper, usernameStr, passwordStr, emailStr)) {
-                        UserSession.getInstance().login(usernameStr);
+                        UserSession.getInstance().login(usernameStr); 
+                        UserSession.getInstance().setUserEmail(emailStr); // <<< Added this for email session fix
 
-                        // Save the "show username" preference
+                        // <<< ADDED Log.d
+                        Log.d(TAG, "MainActivity - Register: Setting LOGGED_IN_USER_ID_KEY to: " + usernameStr);
+                        getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE)
+                                .edit()
+                                .putString(TodoFragment.LOGGED_IN_USER_ID_KEY, usernameStr)
+                                .apply();
+
                         getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
                                 .putBoolean("show_username_" + usernameStr, showUsernameCheckbox.isChecked())
                                 .apply();
-
-                        // Save profile image path (if one was set in this dialog)
-                        // This logic assumes currentPhotoPath (camera) or dialogProfileImage.getTag() (gallery)
-                        // was set by onActivityResult targeting this dialog's dialogProfileImage.
-                        if (currentPhotoPath != null && currentDialogProfileImageView == dialogProfileImage) {
-                            // Camera was used for THIS subscribe dialog instance.
-                            // Rename the temp photo file to be associated with the new username.
-                            File photoFile = new File(currentPhotoPath);
-                            File newFile = new File(getFilesDir(), usernameStr + ".jpg");
-                            if (newFile.exists()) {
-                                newFile.delete(); // Delete if an old one exists (shouldn't for new user, but good practice)
-                            }
-                            if (photoFile.renameTo(newFile)) {
-                                // Successfully saved camera image
-                                getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
-                                        .remove("profile_image_path_" + usernameStr) // Clear any gallery path
-                                        .apply();
+                        
+                        if (dialogProfileImage.getTag() != null && currentDialogProfileImageView == dialogProfileImage) {
+                            if (dialogProfileImage.getTag(R.id.tag_camera_path) != null) {
+                                String cameraPath = (String) dialogProfileImage.getTag(R.id.tag_camera_path);
+                                File photoFile = new File(cameraPath);
+                                File newFile = new File(getFilesDir(), usernameStr + ".jpg");
+                                if (newFile.exists()) newFile.delete(); 
+                                photoFile.renameTo(newFile);
                             } else {
-                                Toast.makeText(this, "Failed to save camera image.", Toast.LENGTH_SHORT).show();
-                            }
-                        } else if (dialogProfileImage.getTag() != null && dialogProfileImage.getTag() instanceof String && currentDialogProfileImageView == dialogProfileImage) {
-                            // Gallery image was selected for THIS subscribe dialog instance.
-                            String imageUriString = (String) dialogProfileImage.getTag();
-                            getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
-                                    .putString("profile_image_path_" + usernameStr, imageUriString)
-                                    .apply();
-                            // If there was a temporary camera file for this session, clean it up
-                            // (though with current logic, camera path leads to rename, not simultaneous gallery)
-                            File oldCameraFile = new File(getFilesDir(), usernameStr + ".jpg");
-                            if (oldCameraFile.exists() && !oldCameraFile.getPath().equals(currentPhotoPath)) {
-                                // Only delete if it's not the one we just saved (unlikely scenario here, but defensive)
+                                String imageUriString = (String) dialogProfileImage.getTag();
+                                getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
+                                        .putString("profile_image_path_" + usernameStr, imageUriString).apply();
                             }
                         }
-
                         updateUserStatusAndImage();
                         Toast.makeText(MainActivity.this, "Registration successful", Toast.LENGTH_SHORT).show();
-                        // Dialog will dismiss automatically
                     } else {
                         Toast.makeText(MainActivity.this, "Registration failed. Username might already exist.", Toast.LENGTH_SHORT).show();
-                        // Don't dismiss
                     }
-                    // Reset dialog-specific state
                     currentDialogProfileImageView = null;
                     currentPhotoPath = null;
                     currentDialogRequestCode = -1;
                 })
-                .setNegativeButton("Cancel", (d, w) -> {
-                    // Reset dialog-specific state on cancel
+                .setNegativeButton("Cancel", (d,w) -> {
                     currentDialogProfileImageView = null;
                     currentPhotoPath = null;
                     currentDialogRequestCode = -1;
                 })
-                .create(); // Create the dialog first
+                .create();
         dialog.show();
     }
-
 
     private boolean authenticate(UserDatabaseHelper dbHelper, String username, String password) {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
@@ -410,7 +435,7 @@ public class MainActivity extends AppCompatActivity {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put("username", username);
-        values.put("password", password);
+        values.put("password", password); 
         values.put("email", email);
         try {
             db.insertOrThrow("users", null, values);

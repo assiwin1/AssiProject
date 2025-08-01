@@ -1,0 +1,44 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tvTotalTasks"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Total Tasks: 0"
+        android:textSize="20sp"
+        android:layout_marginBottom="12dp"
+        android:gravity="start"/>
+
+    <TextView
+        android:id="@+id/tvCompletedTasks"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Completed Tasks: 0"
+        android:textSize="20sp"
+        android:layout_marginBottom="12dp"
+        android:gravity="start"/>
+
+    <TextView
+        android:id="@+id/tvPendingTasks"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Pending Tasks: 0"
+        android:textSize="20sp"
+        android:layout_marginBottom="18dp"
+        android:gravity="start"/>
+
+    <TextView
+        android:id="@+id/tvCompletionPercentage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Completion Rate: 0.0%"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="start"/>
+
+</LinearLayout>

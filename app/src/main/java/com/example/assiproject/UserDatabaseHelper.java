@@ -1,6 +1,7 @@
 package com.example.assiproject;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
@@ -30,5 +31,15 @@ public class UserDatabaseHelper extends SQLiteOpenHelper {
         if(oldVersion<2) {
             db.execSQL("ALTER TABLE users ADD COLUMN email TEXT");
         }
+    }
+    public String getEmailByUsername(String username) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT email FROM users WHERE username = ?", new String[]{username});
+        String email = "";
+        if (cursor.moveToFirst()) {
+            email = cursor.getString(0);
+        }
+        cursor.close();
+        return email;
     }
 }
