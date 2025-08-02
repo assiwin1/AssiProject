@@ -1,44 +1,100 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="16dp">
+    android:padding="24dp">
 
+    <!-- Total Tasks -->
     <TextView
-        android:id="@+id/tvTotalTasks"
+        android:id="@+id/tvTotalTasksLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Total Tasks: 0"
+        android:text="Total Tasks:"
         android:textSize="20sp"
-        android:layout_marginBottom="12dp"
-        android:gravity="start"/>
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
-        android:id="@+id/tvCompletedTasks"
+        android:id="@+id/tvTotalTasksValue"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Completed Tasks: 0"
+        android:text="0"
         android:textSize="20sp"
-        android:layout_marginBottom="12dp"
-        android:gravity="start"/>
+        app:layout_constraintStart_toEndOf="@id/barrierLabels"
+        app:layout_constraintBaseline_toBaselineOf="@id/tvTotalTasksLabel"
+        android:layout_marginStart="8dp"/>
 
+    <!-- Completed Tasks -->
     <TextView
-        android:id="@+id/tvPendingTasks"
+        android:id="@+id/tvCompletedTasksLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Pending Tasks: 0"
+        android:text="Completed Tasks:"
         android:textSize="20sp"
-        android:layout_marginBottom="18dp"
-        android:gravity="start"/>
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvTotalTasksLabel"
+        android:layout_marginTop="12dp"/>
 
     <TextView
-        android:id="@+id/tvCompletionPercentage"
+        android:id="@+id/tvCompletedTasksValue"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Completion Rate: 0.0%"
+        android:text="0"
+        android:textSize="20sp"
+        app:layout_constraintStart_toEndOf="@id/barrierLabels"
+        app:layout_constraintBaseline_toBaselineOf="@id/tvCompletedTasksLabel"
+        android:layout_marginStart="8dp"/>
+
+    <!-- Pending Tasks -->
+    <TextView
+        android:id="@+id/tvPendingTasksLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Pending Tasks:"
+        android:textSize="20sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvCompletedTasksLabel"
+        android:layout_marginTop="12dp"/>
+
+    <TextView
+        android:id="@+id/tvPendingTasksValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:textSize="20sp"
+        app:layout_constraintStart_toEndOf="@id/barrierLabels"
+        app:layout_constraintBaseline_toBaselineOf="@id/tvPendingTasksLabel"
+        android:layout_marginStart="8dp"/>
+
+    <!-- Completion Percentage -->
+    <TextView
+        android:id="@+id/tvCompletionPercentageLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Completion Rate:"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:gravity="start"/>
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvPendingTasksLabel"
+        android:layout_marginTop="18dp"/>
 
-</LinearLayout>
+    <TextView
+        android:id="@+id/tvCompletionPercentageValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0.0%"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:layout_constraintStart_toEndOf="@id/barrierLabels"
+        app:layout_constraintBaseline_toBaselineOf="@id/tvCompletionPercentageLabel"
+        android:layout_marginStart="8dp"/>
+
+    <!-- Barrier to align values -->
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/barrierLabels"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="end"
+        app:constraint_referenced_ids="tvTotalTasksLabel,tvCompletedTasksLabel,tvPendingTasksLabel,tvCompletionPercentageLabel" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

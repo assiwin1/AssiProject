@@ -4,13 +4,6 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Add New Todo"
-        android:textAppearance="?android:attr/textAppearanceLarge"
-        android:layout_marginBottom="16dp"/>
-
     <EditText
         android:id="@+id/inputTodoTitle"
         android:layout_width="match_parent"

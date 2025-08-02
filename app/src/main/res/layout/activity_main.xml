@@ -1,33 +1,50 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center">
+    android:orientation="vertical">
 
-    <ImageView
-        android:id="@+id/mainProfileImageView"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
-        android:src="@drawable/profile" /> <!-- Default placeholder -->
-    <!-- Add this TextView at the top of your layout -->
-    <TextView
-        android:id="@+id/tvUserStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="User status"
-        android:textSize="18sp"
-        android:layout_margin="16dp"/>
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar_main"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:elevation="4dp"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"/>
 
-    <Button
-        android:id="@+id/btnLogin"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Login" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center">
 
-    <Button
-        android:id="@+id/btnSubscribe"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Subscribe" />
+        <ImageView
+            android:id="@+id/mainProfileImageView"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:src="@drawable/profile" />
+
+        <TextView
+            android:id="@+id/tvUserStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="User status"
+            android:textSize="18sp"
+            android:layout_margin="16dp"/>
+
+        <Button
+            android:id="@+id/btnLogin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Login" />
+
+        <Button
+            android:id="@+id/btnSubscribe"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Subscribe" />
+    </LinearLayout>
+
 </LinearLayout>

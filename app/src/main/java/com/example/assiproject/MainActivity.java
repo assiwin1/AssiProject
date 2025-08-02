@@ -2,6 +2,11 @@ package com.example.assiproject;
 
 import static android.text.InputType.TYPE_CLASS_TEXT;
 import static android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD;
+import androidx.appcompat.widget.Toolbar;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
+import androidx.annotation.NonNull;
 
 import android.app.AlertDialog;
 import android.content.ContentValues;
@@ -30,8 +35,9 @@ import android.widget.CheckBox;
 import android.util.Log; // This was already present
 import java.io.File;
 
-public class MainActivity extends AppCompatActivity {
-    private static final String TAG = "UserTodoDebug"; // <<< ADDED TAG DEFINITION
+// Make MainActivity implement the interface from ProfileFragment
+public class MainActivity extends AppCompatActivity implements ProfileFragment.OnProfileFragmentInteractionListener {
+    private static final String TAG = "UserTodoDebug";
 
     private static final int REQUEST_CAMERA = 1;
     private static final int REQUEST_GALLERY = 2;
@@ -39,11 +45,16 @@ public class MainActivity extends AppCompatActivity {
     ImageView currentDialogProfileImageView;
     private int currentDialogRequestCode = -1;
     TextView tvUserStatus;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         EdgeToEdge.enable(this);
+        Toolbar toolbar = findViewById(R.id.toolbar_main);
+        setSupportActionBar(toolbar);
+        Log.d(TAG, "Toolbar set as ActionBar in MainActivity");
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
@@ -56,8 +67,23 @@ public class MainActivity extends AppCompatActivity {
         currentDialogProfileImageView = findViewById(R.id.mainProfileImageView); // This is for the main view initial setup
         tvUserStatus = findViewById(R.id.tvUserStatus); // This is for the main view initial setup
         
-        updateUserStatusAndImage(); 
+        updateUserStatusAndImage();
+        Log.d(TAG, "MainActivity created. Ready to listen for fragment interactions."); 
     }
+
+    // --- START: Implementation of ProfileFragment's Listener ---
+    @Override
+    public void onAppExitRequested() {
+        Log.d(TAG, "onAppExitRequested called from fragment. Attempting to close application.");
+        Toast.makeText(this, "Exiting application...", Toast.LENGTH_SHORT).show();
+
+        Log.d(TAG, "Calling finishAffinity()...");
+        finishAffinity();
+
+        Log.d(TAG, "finishAffinity() called. As a fallback, calling System.exit(0).");
+        System.exit(0);
+    }
+    // --- END: Implementation of ProfileFragment's Listener ---
 
 private void updateUserStatusAndImage() {
     ImageView mainActivityProfileImageView = findViewById(R.id.mainProfileImageView);
@@ -66,7 +92,6 @@ private void updateUserStatusAndImage() {
     if (mainActivityProfileImageView == null || mainTvUserStatus == null) {
         if (!UserSession.getInstance().isGuest()) {
             String username = UserSession.getInstance().getUserName();
-            // <<< ADDED Log.d
             Log.d(TAG, "MainActivity - updateUserStatusAndImage (views missing): Setting LOGGED_IN_USER_ID_KEY to: " + username); 
             getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE)
                     .edit()
@@ -98,7 +123,6 @@ private void updateUserStatusAndImage() {
             mainActivityProfileImageView.setVisibility(View.VISIBLE); 
         }
         
-        // <<< ADDED Log.d
         Log.d(TAG, "MainActivity - updateUserStatusAndImage: Setting LOGGED_IN_USER_ID_KEY to: " + username);
         getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE)
                 .edit()
@@ -268,7 +292,6 @@ private void updateUserStatusAndImage() {
                                     String email = dbHelper.getEmailByUsername(enteredUsername);
                                     UserSession.getInstance().setUserEmail(email);
 
-                                    // <<< ADDED Log.d
                                     Log.d(TAG, "MainActivity - Login: Setting LOGGED_IN_USER_ID_KEY to: " + enteredUsername);
                                     getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE) 
                                             .edit()
@@ -379,9 +402,8 @@ private void updateUserStatusAndImage() {
 
                     if (register(dbHelper, usernameStr, passwordStr, emailStr)) {
                         UserSession.getInstance().login(usernameStr); 
-                        UserSession.getInstance().setUserEmail(emailStr); // <<< Added this for email session fix
+                        UserSession.getInstance().setUserEmail(emailStr); 
 
-                        // <<< ADDED Log.d
                         Log.d(TAG, "MainActivity - Register: Setting LOGGED_IN_USER_ID_KEY to: " + usernameStr);
                         getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE)
                                 .edit()
@@ -444,4 +466,36 @@ private void updateUserStatusAndImage() {
             return false;
         }
     }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.options_menu, menu);
+        Log.d(TAG, "Options menu inflated in MainActivity");
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int itemId = item.getItemId();
+        Log.d(TAG, "MainActivity onOptionsItemSelected: Item selected: " + item.getTitle() + " (ID: " + itemId + ")");
+
+        if (itemId == R.id.action_exit) { // Exit from MainActivity's OWN menu
+            Log.d(TAG, "Exit option selected from MainActivity menu. Calling onAppExitRequested() directly.");
+            onAppExitRequested(); // Call the centralized exit method
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void performLogout() {
+        Log.d(TAG, "Performing logout.");
+        UserSession.getInstance().logout();
+        Toast.makeText(this, "Logged out", Toast.LENGTH_SHORT).show();
+        updateUserStatusAndImage();
+        // Potentially navigate or clear back stack
+    }
+
+    // ... All your other MainActivity methods (showLoginDialog, updateUserStatusAndImage, etc.) ...
+
 }

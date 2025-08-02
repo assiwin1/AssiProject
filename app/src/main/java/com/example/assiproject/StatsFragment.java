@@ -12,7 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import java.text.DecimalFormat; // Added for percentage formatting
+import java.text.DecimalFormat;
 import java.util.List;
 
 public class StatsFragment extends Fragment {
@@ -22,7 +22,8 @@ public class StatsFragment extends Fragment {
     public static final String USER_PREFS_NAME = "UserPrefs";
     public static final String LOGGED_IN_USER_ID_KEY = "logged_in_user_id";
 
-    private TextView tvTotalTasks, tvCompletedTasks, tvPendingTasks, tvCompletionPercentage; // Added tvCompletionPercentage
+    // TextViews for displaying the *values*
+    private TextView tvTotalTasksValue, tvCompletedTasksValue, tvPendingTasksValue, tvCompletionPercentageValue;
     private TodoDatabase db;
     private String currentUserId;
 
@@ -54,10 +55,11 @@ public class StatsFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        tvTotalTasks = view.findViewById(R.id.tvTotalTasks);
-        tvCompletedTasks = view.findViewById(R.id.tvCompletedTasks);
-        tvPendingTasks = view.findViewById(R.id.tvPendingTasks);
-        tvCompletionPercentage = view.findViewById(R.id.tvCompletionPercentage); // Initialize new TextView
+        // Initialize TextViews for values using the IDs from ConstraintLayout
+        tvTotalTasksValue = view.findViewById(R.id.tvTotalTasksValue);
+        tvCompletedTasksValue = view.findViewById(R.id.tvCompletedTasksValue);
+        tvPendingTasksValue = view.findViewById(R.id.tvPendingTasksValue);
+        tvCompletionPercentageValue = view.findViewById(R.id.tvCompletionPercentageValue);
     }
 
     @Override
@@ -74,20 +76,20 @@ public class StatsFragment extends Fragment {
     }
 
     private void loadStats() {
-        if (tvTotalTasks == null || tvCompletedTasks == null || tvPendingTasks == null || tvCompletionPercentage == null) { // Check new TextView
-            Log.e(TAG, "TextViews not initialized in loadStats. One or more are null.");
-             if (getView() != null) {
-                 tvTotalTasks = getView().findViewById(R.id.tvTotalTasks);
-                 tvCompletedTasks = getView().findViewById(R.id.tvCompletedTasks);
-                 tvPendingTasks = getView().findViewById(R.id.tvPendingTasks);
-                 tvCompletionPercentage = getView().findViewById(R.id.tvCompletionPercentage); // Re-acquire new TextView
-                 if (tvTotalTasks == null || tvCompletedTasks == null || tvPendingTasks == null || tvCompletionPercentage == null) {
-                    Log.e(TAG, "Failed to re-acquire TextViews in loadStats. Cannot update UI.");
-                    return; 
+        if (tvTotalTasksValue == null || tvCompletedTasksValue == null || tvPendingTasksValue == null || tvCompletionPercentageValue == null) {
+            Log.e(TAG, "Value TextViews not initialized in loadStats. One or more are null.");
+            if (getView() != null) { // Try to re-acquire views if they are null
+                 tvTotalTasksValue = getView().findViewById(R.id.tvTotalTasksValue);
+                 tvCompletedTasksValue = getView().findViewById(R.id.tvCompletedTasksValue);
+                 tvPendingTasksValue = getView().findViewById(R.id.tvPendingTasksValue);
+                 tvCompletionPercentageValue = getView().findViewById(R.id.tvCompletionPercentageValue);
+                 if (tvTotalTasksValue == null || tvCompletedTasksValue == null || tvPendingTasksValue == null || tvCompletionPercentageValue == null) {
+                    Log.e(TAG, "Failed to re-acquire Value TextViews in loadStats. Cannot update UI.");
+                    return; // Exit if views are still null
                  }
             } else {
-                 Log.e(TAG, "getView() is null in loadStats. Cannot re-acquire TextViews or update UI.");
-                 return;
+                 Log.e(TAG, "getView() is null in loadStats. Cannot re-acquire Value TextViews or update UI.");
+                 return; // Exit if view is null
             }
         }
 
@@ -105,12 +107,13 @@ public class StatsFragment extends Fragment {
                 }
                 int pendingTasks = totalTasks - completedTasks;
                 double completionPercentage = (totalTasks == 0) ? 0.0 : (completedTasks * 100.0) / totalTasks;
-                DecimalFormat df = new DecimalFormat("#.#"); // Format to one decimal place
+                DecimalFormat df = new DecimalFormat("#.#");
 
-                tvTotalTasks.setText("Total Tasks: " + totalTasks);
-                tvCompletedTasks.setText("Completed Tasks: " + completedTasks);
-                tvPendingTasks.setText("Pending Tasks: " + pendingTasks);
-                tvCompletionPercentage.setText("Completion Rate: " + df.format(completionPercentage) + "%");
+                // Set only the values to the respective TextViews
+                tvTotalTasksValue.setText(String.valueOf(totalTasks));
+                tvCompletedTasksValue.setText(String.valueOf(completedTasks));
+                tvPendingTasksValue.setText(String.valueOf(pendingTasks));
+                tvCompletionPercentageValue.setText(df.format(completionPercentage) + "%");
                 Log.d(TAG, "loadStats: DAO returned " + totalTasks + " items. Completed: " + completedTasks + ", Pending: " + pendingTasks + ", Percentage: " + df.format(completionPercentage) + "%");
             } else {
                 Log.d(TAG, "loadStats: userTodos list is null for user: " + currentUserId);
@@ -123,9 +126,10 @@ public class StatsFragment extends Fragment {
     }
 
     private void setStatsToDefault() {
-        if (tvTotalTasks != null) tvTotalTasks.setText("Total Tasks: N/A");
-        if (tvCompletedTasks != null) tvCompletedTasks.setText("Completed Tasks: N/A");
-        if (tvPendingTasks != null) tvPendingTasks.setText("Pending Tasks: N/A");
-        if (tvCompletionPercentage != null) tvCompletionPercentage.setText("Completion Rate: N/A"); // Reset percentage
+        String na = "N/A";
+        if (tvTotalTasksValue != null) tvTotalTasksValue.setText(na);
+        if (tvCompletedTasksValue != null) tvCompletedTasksValue.setText(na);
+        if (tvPendingTasksValue != null) tvPendingTasksValue.setText(na);
+        if (tvCompletionPercentageValue != null) tvCompletionPercentageValue.setText(na);
     }
 }

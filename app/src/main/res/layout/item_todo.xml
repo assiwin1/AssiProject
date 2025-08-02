@@ -1,37 +1,64 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="vertical" android:padding="12dp">
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="12dp">
 
     <LinearLayout
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
         <CheckBox
             android:id="@+id/todoCheck"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content" />
+
         <TextView
             android:id="@+id/todoText"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textStyle="bold"
+            android:paddingStart="8dp"
             android:textSize="18sp"
-            android:paddingStart="8dp"/>
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/btnEditTodo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@android:drawable/ic_menu_edit"
+            android:contentDescription="Edit Todo"
+            android:padding="8dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless" />
+
+        <ImageView
+            android:id="@+id/btnDeleteTodo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@android:drawable/ic_menu_delete"
+            android:contentDescription="Delete Todo"
+            android:padding="8dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/todoDescription"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="15sp"
         android:paddingTop="4dp"
-        android:textColor="#444"/>
+        android:textColor="#444"
+        android:textSize="15sp"
+        android:layout_marginStart="40dp" /> <!-- Added marginStart to align with text after CheckBox -->
 
     <TextView
         android:id="@+id/todoDate"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="12sp"
+        android:paddingTop="2dp"
         android:textColor="#888"
-        android:paddingTop="2dp"/>
+        android:textSize="12sp"
+        android:layout_marginStart="40dp" /> <!-- Added marginStart to align with text after CheckBox -->
+
 </LinearLayout>
