@@ -22,7 +22,7 @@ import com.example.assiproject.TodoFragment; // Added this import
 // Import Log and Toast if not already present
 import android.util.Log;
 import android.widget.Toast;
-
+import com.example.assiproject.ProfileFragment;
 // Make LandingActivity implement the interface from ProfileFragment
 public class LandingActivity extends AppCompatActivity implements ProfileFragment.OnProfileFragmentInteractionListener {
 

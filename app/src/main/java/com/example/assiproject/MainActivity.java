@@ -1,501 +1,400 @@
 package com.example.assiproject;
 
-import static android.text.InputType.TYPE_CLASS_TEXT;
-import static android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD;
-import androidx.appcompat.widget.Toolbar;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
-import androidx.annotation.NonNull;
-
-import android.app.AlertDialog;
-import android.content.ContentValues;
-import android.content.Context; // Added for SharedPreferences in login
+import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
-import android.widget.EditText;
-import android.widget.LinearLayout;
+
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.ImageView;
-import android.widget.Button;
 
-import androidx.activity.EdgeToEdge;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-import android.widget.CheckBox;
-import android.util.Log; // This was already present
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+
+// Ensure this import is correct for your UserSession class
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+
 import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
-// Make MainActivity implement the interface from ProfileFragment
-public class MainActivity extends AppCompatActivity implements ProfileFragment.OnProfileFragmentInteractionListener {
-    private static final String TAG = "UserTodoDebug";
+public class MainActivity extends AppCompatActivity implements LoginDialog.LoginDialogListener, RegisterDialog.RegisterDialogListener, LogoutDialog.LogoutDialogListener {
 
-    private static final int REQUEST_CAMERA = 1;
-    private static final int REQUEST_GALLERY = 2;
-    private String currentPhotoPath;
-    ImageView currentDialogProfileImageView;
-    private int currentDialogRequestCode = -1;
-    TextView tvUserStatus;
+    private static final String TAG = "MainActivity"; // General MainActivity Log tag
+    // Specific tag for detailed user state debugging in onCreate
+    private static final String USER_STATE_DEBUG_TAG = "USER_STATE_DEBUG";
+    // Centralize SharedPreferences names and keys (must match MyApplication)
+    private static final String USER_PREFS_NAME = "UserPrefs";
+    private static final String LOGGED_IN_USER_ID_KEY = "logged_in_user_id";
+    public static final String KEY_SHOW_USERNAME = "KEY_SHOW_USERNAME";
+
+
+    private UserDatabaseHelper dbHelper;
+    private ImageView mainProfileImageView;
+    private TextView mainUsernameTextView;
+    private ImageButton menuButton;
+    private BottomNavigationView bottomNavigationView;
+    private Uri currentPhotoUri;
+
+    private final ActivityResultLauncher<Intent> takePictureLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    mainProfileImageView.setImageURI(currentPhotoUri);
+                    User currentUser = UserSession.getInstance().getCurrentUser();
+                    if (currentUser != null && currentPhotoUri != null) {
+                        currentUser.setProfileImagePath(currentPhotoUri.toString());
+                        dbHelper.updateUser(currentUser); // Changed from updateUserProfileImage
+                        Toast.makeText(this, "Profile image updated!", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(this, "Failed to capture image", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+    private final ActivityResultLauncher<String> selectPictureLauncher = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                if (uri != null) {
+                    mainProfileImageView.setImageURI(uri);
+                    User currentUser = UserSession.getInstance().getCurrentUser();
+                    if (currentUser != null) {
+                        currentUser.setProfileImagePath(uri.toString());
+                        dbHelper.updateUser(currentUser); // Changed from updateUserProfileImage
+                        Toast.makeText(this, "Profile image updated!", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(this, "No image selected", Toast.LENGTH_SHORT).show();
+                }
+            });
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: --- START ---");
+
+        UserSession currentSession = UserSession.getInstance();
+        Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: UserSession.getInstance() CALLED. UserSession.isGuest() now reports: " + currentSession.isGuest());
+
+        SharedPreferences mainActivityPrefs = getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE);
+        String userIdFromPrefsInMain = mainActivityPrefs.getString(LOGGED_IN_USER_ID_KEY, null);
+        Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: '" + LOGGED_IN_USER_ID_KEY + "' from SharedPreferences ('" + USER_PREFS_NAME + "') AFTER UserSession.getInstance(): " + (userIdFromPrefsInMain == null ? "IS NULL" : userIdFromPrefsInMain));
+
         setContentView(R.layout.activity_main);
-        EdgeToEdge.enable(this);
-        Toolbar toolbar = findViewById(R.id.toolbar_main);
-        setSupportActionBar(toolbar);
-        Log.d(TAG, "Toolbar set as ActionBar in MainActivity");
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
-        });
-        UserDatabaseHelper dbHelper = new UserDatabaseHelper(this);
+        dbHelper = new UserDatabaseHelper(this);
+        mainProfileImageView = findViewById(R.id.mainProfileImageView);
+        mainUsernameTextView = findViewById(R.id.mainUsernameTextView);
+        menuButton = findViewById(R.id.menuButton);
+        bottomNavigationView = findViewById(R.id.bottom_navigation);
 
-        findViewById(R.id.btnLogin).setOnClickListener(v -> showLoginDialog(dbHelper));
-        findViewById(R.id.btnSubscribe).setOnClickListener(v -> showSubscribeDialog(dbHelper));
-        currentDialogProfileImageView = findViewById(R.id.mainProfileImageView); // This is for the main view initial setup
-        tvUserStatus = findViewById(R.id.tvUserStatus); // This is for the main view initial setup
-        
-        updateUserStatusAndImage();
-        Log.d(TAG, "MainActivity created. Ready to listen for fragment interactions."); 
-    }
+        Log.d(TAG, "onCreate: Views initialized."); // General log
 
-    // --- START: Implementation of ProfileFragment's Listener ---
-    @Override
-    public void onAppExitRequested() {
-        Log.d(TAG, "onAppExitRequested called from fragment. Attempting to close application.");
-        Toast.makeText(this, "Exiting application...", Toast.LENGTH_SHORT).show();
+        setupMenuButton();
+        setupBottomNavigationView();
+        updateUserStatusAndImage(); // Update top bar UI based on UserSession state
 
-        Log.d(TAG, "Calling finishAffinity()...");
-        finishAffinity();
-
-        Log.d(TAG, "finishAffinity() called. As a fallback, calling System.exit(0).");
-        System.exit(0);
-    }
-    // --- END: Implementation of ProfileFragment's Listener ---
-
-private void updateUserStatusAndImage() {
-    ImageView mainActivityProfileImageView = findViewById(R.id.mainProfileImageView);
-    TextView mainTvUserStatus = findViewById(R.id.tvUserStatus);
-
-    if (mainActivityProfileImageView == null || mainTvUserStatus == null) {
-        if (!UserSession.getInstance().isGuest()) {
-            String username = UserSession.getInstance().getUserName();
-            Log.d(TAG, "MainActivity - updateUserStatusAndImage (views missing): Setting LOGGED_IN_USER_ID_KEY to: " + username); 
-            getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE)
-                    .edit()
-                    .putString(TodoFragment.LOGGED_IN_USER_ID_KEY, username)
-                    .apply();
-            Intent intent = new Intent(MainActivity.this, LandingActivity.class);
-            startActivity(intent);
-            finish();
-        }
-        return; 
-    }
-
-    if (UserSession.getInstance().isGuest()) {
-        mainTvUserStatus.setText("Please login or subscribe");
-        mainActivityProfileImageView.setImageResource(R.drawable.profile); 
-        mainActivityProfileImageView.setVisibility(View.VISIBLE);
-    } else {
-        String username = UserSession.getInstance().getUserName();
-        boolean showUserDetailsPref = getSharedPreferences("user_prefs", MODE_PRIVATE)
-                .getBoolean("show_username_" + username, true);
-
-        if (showUserDetailsPref) {
-            mainTvUserStatus.setText("Welcome, " + username);
-            loadProfileImageForUser(username, mainActivityProfileImageView);
-            mainActivityProfileImageView.setVisibility(View.VISIBLE);
-        } else {
-            mainTvUserStatus.setText("Welcome (User details hidden)");
-            mainActivityProfileImageView.setImageResource(R.drawable.profile);
-            mainActivityProfileImageView.setVisibility(View.VISIBLE); 
-        }
-        
-        Log.d(TAG, "MainActivity - updateUserStatusAndImage: Setting LOGGED_IN_USER_ID_KEY to: " + username);
-        getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE)
-                .edit()
-                .putString(TodoFragment.LOGGED_IN_USER_ID_KEY, username)
-                .apply();
-
-        Intent intent = new Intent(MainActivity.this, LandingActivity.class);
-        startActivity(intent);
-        finish(); 
-    }
-}
-
-    private void loadProfileImageForUser(String username, ImageView imageViewToUpdate) {
-        if (username == null || imageViewToUpdate == null) {
-            if (imageViewToUpdate != null) {
-                imageViewToUpdate.setImageResource(R.drawable.profile);
+        if (userIdFromPrefsInMain == null) {
+            Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: GUEST PATH chosen (userIdFromPrefsInMain is NULL). UI: No BottomNav, Empty Fragment Area.");
+            bottomNavigationView.setVisibility(View.GONE);
+            Fragment existingFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+            if (existingFragment != null) {
+                Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: GUEST PATH - Removing existing fragment: " + existingFragment.getClass().getSimpleName());
+                getSupportFragmentManager().beginTransaction().remove(existingFragment).commitNow();
+            } else {
+                Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: GUEST PATH - No existing fragment to remove.");
             }
-            return;
-        }
-        File photoFile = new File(getFilesDir(), username + ".jpg");
-        if (photoFile.exists()) {
-            imageViewToUpdate.setImageURI(Uri.fromFile(photoFile));
-            return;
-        }
-        String path = getSharedPreferences("user_prefs", MODE_PRIVATE)
-                .getString("profile_image_path_" + username, null); 
-        if (path != null) {
-            imageViewToUpdate.setImageURI(Uri.parse(path));
-        } else {
-            imageViewToUpdate.setImageResource(R.drawable.profile);
-        }
-    }
-    private void showPictureDialog() {
-        String[] options = {"Take Photo", "Choose from Gallery"};
-        new AlertDialog.Builder(this)
-                .setTitle("Set Profile Picture")
-                .setItems(options, (d, which) -> {
-                    if (which == 0) openCamera();
-                    else openGallery();
-                })
-                .show();
-    }
-    private void openCamera() {
-        String username = UserSession.getInstance().getUserName(); 
-        if (username == null && currentDialogProfileImageView == findViewById(R.id.mainProfileImageView) ) { 
-            Toast.makeText(this, "Login required for camera photo", Toast.LENGTH_SHORT).show();
-            return; 
-        }
-        String tempFileName = (username != null) ? username + ".jpg" : "temp_profile_pic.jpg";
-        File photoFile = new File(getFilesDir(), tempFileName);
-
-        Uri photoURI = FileProvider.getUriForFile(this, getPackageName() + ".provider", photoFile);
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
-        currentPhotoPath = photoFile.getAbsolutePath(); 
-        startActivityForResult(intent, REQUEST_CAMERA);
-    }
-    private void openGallery() {
-        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        startActivityForResult(intent, REQUEST_GALLERY);
-    }
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK) {
-            Uri imageUri = null;
-            if (requestCode == REQUEST_CAMERA) {
-                imageUri = Uri.fromFile(new File(currentPhotoPath));
-            } else if (requestCode == REQUEST_GALLERY && data != null) {
-                imageUri = data.getData();
+            if (!currentSession.isGuest()) {
+                Log.w(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: GUEST PATH (Prefs NULL) but UserSession reports NOT GUEST. Forcing UserSession.logout() to sync.");
+                currentSession.logout();
+                updateUserStatusAndImage();
             }
-
-            if (imageUri != null && currentDialogProfileImageView != null) {
-                currentDialogProfileImageView.setImageURI(imageUri);
-                if (currentDialogProfileImageView != findViewById(R.id.mainProfileImageView)) {
-                    currentDialogProfileImageView.setTag(imageUri.toString());
-                    if (requestCode == REQUEST_CAMERA) {
-                        currentDialogProfileImageView.setTag(R.id.tag_camera_path, currentPhotoPath);
-                    }
+        } else {
+            Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: LOGGED-IN PATH chosen (userIdFromPrefsInMain: " + userIdFromPrefsInMain + "). UI: Show BottomNav, Load TodoFragment.");
+            bottomNavigationView.setVisibility(View.VISIBLE);
+            Fragment currentFragmentInContainer = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+            if (currentFragmentInContainer == null) {
+                Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: LOGGED-IN PATH - No fragment in container, loading TodoFragment.");
+                loadFragment(new TodoFragment(), false);
+                bottomNavigationView.setSelectedItemId(R.id.nav_todo);
+            } else {
+                Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: LOGGED-IN PATH - Fragment " + currentFragmentInContainer.getClass().getSimpleName() + " already in container. Syncing BottomNav.");
+                if (currentFragmentInContainer instanceof TodoFragment) {
+                    bottomNavigationView.setSelectedItemId(R.id.nav_todo);
+                } else if (currentFragmentInContainer instanceof StatsFragment) {
+                    bottomNavigationView.setSelectedItemId(R.id.nav_stats);
+                } else if (currentFragmentInContainer instanceof ProfileFragment) {
+                    bottomNavigationView.setSelectedItemId(R.id.nav_profile);
+                } else {
+                    Log.w(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: LOGGED-IN PATH - Unexpected fragment " + currentFragmentInContainer.getClass().getSimpleName() + ". Loading TodoFragment.");
+                    loadFragment(new TodoFragment(), false);
+                    bottomNavigationView.setSelectedItemId(R.id.nav_todo);
                 }
             }
-            if (requestCode == REQUEST_CAMERA && currentDialogProfileImageView == findViewById(R.id.mainProfileImageView)) {
-                 getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
-                         .remove("profile_image_path_" + UserSession.getInstance().getUserName()) 
-                         .apply(); 
-            } else if (requestCode == REQUEST_GALLERY && data != null && currentDialogProfileImageView == findViewById(R.id.mainProfileImageView)) {
-                 getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
-                         .putString("profile_image_path_" + UserSession.getInstance().getUserName(), data.getData().toString())
-                         .apply();
-            }
-
-            if(currentDialogProfileImageView != findViewById(R.id.mainProfileImageView)){
-            }
         }
+        Log.i(USER_STATE_DEBUG_TAG, "MainActivity.onCreate: --- END ---");
     }
 
-    private void showLoginDialog(UserDatabaseHelper dbHelper) {
-        LinearLayout usernameDialogLayout = new LinearLayout(this);
-        usernameDialogLayout.setOrientation(LinearLayout.VERTICAL);
-        int paddingInDp = 16;
-        float scale = getResources().getDisplayMetrics().density;
-        int paddingInPx = (int) (paddingInDp * scale + 0.5f);
-        usernameDialogLayout.setPadding(paddingInPx, paddingInPx, paddingInPx, paddingInPx);
-
-        ImageView usernameDialogProfileImage = new ImageView(this);
-        usernameDialogProfileImage.setImageResource(R.drawable.profile);
-        LinearLayout.LayoutParams imageParamsDialog = new LinearLayout.LayoutParams(
-                200, 200 
-        );
-        imageParamsDialog.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-        imageParamsDialog.bottomMargin = paddingInPx / 2;
-        usernameDialogProfileImage.setLayoutParams(imageParamsDialog);
-        usernameDialogLayout.addView(usernameDialogProfileImage);
-
-        Button btnChangeUsernameDialogPicture = new Button(this);
-        btnChangeUsernameDialogPicture.setText("Change Picture");
-        LinearLayout.LayoutParams buttonParamsDialog = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        buttonParamsDialog.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-        buttonParamsDialog.bottomMargin = paddingInPx;
-        btnChangeUsernameDialogPicture.setLayoutParams(buttonParamsDialog);
-        usernameDialogLayout.addView(btnChangeUsernameDialogPicture);
-
-
-        final EditText usernameEditText = new EditText(this);
-        usernameEditText.setHint("Username");
-        usernameDialogLayout.addView(usernameEditText);
-
-        btnChangeUsernameDialogPicture.setOnClickListener(v -> {
-            currentDialogProfileImageView = usernameDialogProfileImage;
-            currentDialogRequestCode = REQUEST_CAMERA; 
-            showPictureDialog();
+    private void setupMenuButton() {
+        menuButton.setOnClickListener(v -> {
+            PopupMenu popupMenu = new PopupMenu(MainActivity.this, v);
+            if (UserSession.getInstance().isGuest()) {
+                popupMenu.getMenu().add("Login");
+                popupMenu.getMenu().add("Register");
+            } else {
+                popupMenu.getMenu().add("Logout");
+            }
+            popupMenu.setOnMenuItemClickListener(item -> {
+                CharSequence title = item.getTitle();
+                if ("Login".equals(title)) {
+                    showLoginDialog("Login to your account");
+                } else if ("Register".equals(title)) {
+                    RegisterDialog.newInstance().show(getSupportFragmentManager(), "RegisterDialog");
+                } else if ("Logout".equals(title)) {
+                    new LogoutDialog().show(getSupportFragmentManager(), "LogoutDialog");
+                }
+                return true;
+            });
+            popupMenu.show();
         });
-
-
-        new AlertDialog.Builder(this)
-                .setTitle("Login - Step 1: Username")
-                .setView(usernameDialogLayout)
-                .setPositiveButton("Next", (dialog, which) -> {
-                    String usernameFromDialog = usernameEditText.getText().toString().trim(); // Renamed to avoid conflict
-
-                    LinearLayout passwordDialogLayout = new LinearLayout(this);
-                    passwordDialogLayout.setOrientation(LinearLayout.VERTICAL);
-                    passwordDialogLayout.setPadding(paddingInPx, paddingInPx, paddingInPx, paddingInPx);
-
-                    final EditText passwordEditText = new EditText(this);
-                    passwordEditText.setHint("Password");
-                    passwordEditText.setInputType(TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_PASSWORD);
-                    passwordDialogLayout.addView(passwordEditText);
-
-                    new AlertDialog.Builder(MainActivity.this)
-                            .setTitle("Login - Step 2: Password")
-                            .setView(passwordDialogLayout)
-                            .setPositiveButton("Login", (d2, w2) -> {
-                                String enteredUsername = usernameEditText.getText().toString().trim(); 
-                                String enteredPassword = passwordEditText.getText().toString().trim();
-
-                                if (enteredUsername.isEmpty() || enteredPassword.isEmpty()) {
-                                    Toast.makeText(MainActivity.this, "Username and password cannot be empty", Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-
-                                if (authenticate(dbHelper, enteredUsername, enteredPassword)) {
-                                    UserSession.getInstance().login(enteredUsername);
-                                    String email = dbHelper.getEmailByUsername(enteredUsername);
-                                    UserSession.getInstance().setUserEmail(email);
-
-                                    Log.d(TAG, "MainActivity - Login: Setting LOGGED_IN_USER_ID_KEY to: " + enteredUsername);
-                                    getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE) 
-                                            .edit()
-                                            .putString(TodoFragment.LOGGED_IN_USER_ID_KEY, enteredUsername) 
-                                            .apply();
-                                    
-                                    if (usernameDialogProfileImage.getTag() != null && currentDialogProfileImageView == usernameDialogProfileImage) {
-                                         if (usernameDialogProfileImage.getTag(R.id.tag_camera_path) != null) {
-                                            String cameraPath = (String) usernameDialogProfileImage.getTag(R.id.tag_camera_path);
-                                            File photoFile = new File(cameraPath);
-                                            File newFile = new File(getFilesDir(), enteredUsername + ".jpg");
-                                            if (newFile.exists()) newFile.delete();
-                                            photoFile.renameTo(newFile);
-                                            getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
-                                                    .remove("profile_image_path_" + enteredUsername).apply();
-                                        } else {
-                                            String imageUriString = (String) usernameDialogProfileImage.getTag();
-                                             getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
-                                                    .putString("profile_image_path_" + enteredUsername, imageUriString).apply();
-                                        }
-                                    }
-                                    updateUserStatusAndImage();
-                                    Toast.makeText(MainActivity.this, "Login successful", Toast.LENGTH_SHORT).show();
-                                } else {
-                                    Toast.makeText(MainActivity.this, "Invalid credentials", Toast.LENGTH_SHORT).show();
-                                }
-                                currentDialogProfileImageView = null;
-                                currentPhotoPath = null;
-                                currentDialogRequestCode = -1;
-                            })
-                            .setNegativeButton("Cancel", (d,w) -> {
-                                currentDialogProfileImageView = null;
-                                currentPhotoPath = null;
-                                currentDialogRequestCode = -1;
-                            })
-                            .show();
-                })
-                .setNegativeButton("Cancel", (d,w) -> {
-                    currentDialogProfileImageView = null;
-                    currentPhotoPath = null;
-                    currentDialogRequestCode = -1;
-                })
-                .show();
     }
 
-    private void showSubscribeDialog(UserDatabaseHelper dbHelper) {
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
+    private void setupBottomNavigationView() {
+        bottomNavigationView.setOnItemSelectedListener(item -> {
+            UserSession session = UserSession.getInstance();
+            Fragment selectedFragment = null;
+            int itemId = item.getItemId();
 
-        int paddingInDp = 16;
-        float scale = getResources().getDisplayMetrics().density;
-        int paddingInPx = (int) (paddingInDp * scale + 0.5f);
-        layout.setPadding(paddingInPx, paddingInPx, paddingInPx, paddingInPx);
-
-        ImageView dialogProfileImage = new ImageView(this);
-        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(200, 200);
-        imageParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-        imageParams.bottomMargin = paddingInPx / 2;
-        dialogProfileImage.setLayoutParams(imageParams);
-        dialogProfileImage.setImageResource(R.drawable.profile);
-        layout.addView(dialogProfileImage);
-
-        Button btnChangePicture = new Button(this);
-        btnChangePicture.setText("Change Picture");
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        buttonParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-        buttonParams.bottomMargin = paddingInPx;
-        btnChangePicture.setLayoutParams(buttonParams);
-        layout.addView(btnChangePicture);
-
-        EditText usernameEditText = new EditText(this);
-        usernameEditText.setHint("Username");
-        layout.addView(usernameEditText);
-
-        EditText passwordEditText = new EditText(this);
-        passwordEditText.setHint("Password");
-        passwordEditText.setInputType(TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_PASSWORD);
-        layout.addView(passwordEditText);
-
-        EditText emailEditText = new EditText(this);
-        emailEditText.setHint("Email");
-        layout.addView(emailEditText);
-
-        CheckBox showUsernameCheckbox = new CheckBox(this);
-        showUsernameCheckbox.setText("Show username in all application windows");
-        layout.addView(showUsernameCheckbox);
-
-        btnChangePicture.setOnClickListener(v -> {
-            currentDialogProfileImageView = dialogProfileImage;
-            currentDialogRequestCode = -1; 
-            showPictureDialog();
-        });
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Subscribe")
-                .setView(layout)
-                .setPositiveButton("Register", (d, w) -> {
-                    String usernameStr = usernameEditText.getText().toString().trim();
-                    String passwordStr = passwordEditText.getText().toString().trim();
-                    String emailStr = emailEditText.getText().toString().trim();
-
-                    if (usernameStr.isEmpty() || passwordStr.isEmpty() || emailStr.isEmpty()) {
-                        Toast.makeText(MainActivity.this, "All fields are required", Toast.LENGTH_SHORT).show();
-                        return;
+            if (itemId == R.id.nav_home) {
+                Log.d(TAG, "BottomNav: Home selected.");
+                if (session.isGuest()) {
+                    Log.d(TAG, "BottomNav: Home selected by GUEST. Clearing fragment area.");
+                    Fragment existingFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+                    if (existingFragment != null) {
+                        getSupportFragmentManager().beginTransaction().remove(existingFragment).commit();
                     }
+                    return true;
+                } else {
+                    Log.d(TAG, "BottomNav: Home selected by LOGGED-IN USER. Loading TodoFragment as default home.");
+                    selectedFragment = new TodoFragment();
+                }
+            } else if (itemId == R.id.nav_todo) {
+                Log.d(TAG, "BottomNav: Todo selected.");
+                if (session.isGuest()) {
+                    Log.d(TAG, "BottomNav: Todo selected by GUEST. Showing login dialog.");
+                    showLoginDialog("Access To-Do List");
+                    return false;
+                }
+                selectedFragment = new TodoFragment();
+            } else if (itemId == R.id.nav_stats) {
+                Log.d(TAG, "BottomNav: Stats selected.");
+                if (session.isGuest()) {
+                    Log.d(TAG, "BottomNav: Stats selected by GUEST. Showing login dialog.");
+                    showLoginDialog("Access Stats");
+                    return false;
+                }
+                selectedFragment = new StatsFragment();
+            } else if (itemId == R.id.nav_profile) {
+                Log.d(TAG, "BottomNav: Profile selected.");
+                if (session.isGuest()) {
+                    Log.d(TAG, "BottomNav: Profile selected by GUEST. Showing login dialog.");
+                    showLoginDialog("Access Profile");
+                    return false;
+                }
+                selectedFragment = new ProfileFragment();
+            }
 
-                    if (register(dbHelper, usernameStr, passwordStr, emailStr)) {
-                        UserSession.getInstance().login(usernameStr); 
-                        UserSession.getInstance().setUserEmail(emailStr); 
-
-                        Log.d(TAG, "MainActivity - Register: Setting LOGGED_IN_USER_ID_KEY to: " + usernameStr);
-                        getSharedPreferences(TodoFragment.USER_PREFS_NAME, MODE_PRIVATE)
-                                .edit()
-                                .putString(TodoFragment.LOGGED_IN_USER_ID_KEY, usernameStr)
-                                .apply();
-
-                        getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
-                                .putBoolean("show_username_" + usernameStr, showUsernameCheckbox.isChecked())
-                                .apply();
-                        
-                        if (dialogProfileImage.getTag() != null && currentDialogProfileImageView == dialogProfileImage) {
-                            if (dialogProfileImage.getTag(R.id.tag_camera_path) != null) {
-                                String cameraPath = (String) dialogProfileImage.getTag(R.id.tag_camera_path);
-                                File photoFile = new File(cameraPath);
-                                File newFile = new File(getFilesDir(), usernameStr + ".jpg");
-                                if (newFile.exists()) newFile.delete(); 
-                                photoFile.renameTo(newFile);
-                            } else {
-                                String imageUriString = (String) dialogProfileImage.getTag();
-                                getSharedPreferences("user_prefs", MODE_PRIVATE).edit()
-                                        .putString("profile_image_path_" + usernameStr, imageUriString).apply();
-                            }
-                        }
-                        updateUserStatusAndImage();
-                        Toast.makeText(MainActivity.this, "Registration successful", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(MainActivity.this, "Registration failed. Username might already exist.", Toast.LENGTH_SHORT).show();
-                    }
-                    currentDialogProfileImageView = null;
-                    currentPhotoPath = null;
-                    currentDialogRequestCode = -1;
-                })
-                .setNegativeButton("Cancel", (d,w) -> {
-                    currentDialogProfileImageView = null;
-                    currentPhotoPath = null;
-                    currentDialogRequestCode = -1;
-                })
-                .create();
-        dialog.show();
-    }
-
-    private boolean authenticate(UserDatabaseHelper dbHelper, String username, String password) {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = db.query("users", null, "username=? AND password=?", new String[]{username, password}, null, null, null);
-        boolean result = cursor.moveToFirst();
-        cursor.close();
-        return result;
-    }
-
-    private boolean register(UserDatabaseHelper dbHelper, String username, String password, String email) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put("username", username);
-        values.put("password", password); 
-        values.put("email", email);
-        try {
-            db.insertOrThrow("users", null, values);
-            return true;
-        } catch (Exception e) {
+            if (selectedFragment != null) {
+                Log.d(TAG, "BottomNav: Loading fragment: " + selectedFragment.getClass().getSimpleName());
+                loadFragment(selectedFragment, true);
+                return true;
+            }
+            Log.d(TAG, "BottomNav: No fragment selected or action taken for itemId: " + itemId);
             return false;
+        });
+    }
+
+    public void loadFragment(Fragment fragment, boolean addToBackStack) {
+        Log.d(TAG, "Loading fragment: " + fragment.getClass().getSimpleName() + ", addToBackStack: " + addToBackStack);
+        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+        transaction.replace(R.id.fragment_container, fragment);
+        if (addToBackStack) {
+            transaction.addToBackStack(fragment.getClass().getSimpleName());
+        }
+        transaction.commit();
+    }
+
+    private void showLoginDialog(String message) {
+        Log.d(TAG, "Showing login dialog with message: " + message);
+        LoginDialog dialog = LoginDialog.newInstance(message);
+        dialog.show(getSupportFragmentManager(), "LoginDialog");
+    }
+
+    @Override
+    public void onLoginSuccess(String username) {
+        Log.i(TAG, "onLoginSuccess: Callback received for username: " + username);
+        User user = dbHelper.getUserByUsername(username);
+
+        if (user != null) {
+            Log.i(TAG, "onLoginSuccess: User '" + user.getUsername() + "' found in database. Proceeding with login.");
+            UserSession.getInstance().login(user); // Added this line
+            
+            // Also update SharedPreferences so fragments like TodoFragment can find it
+            getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(LOGGED_IN_USER_ID_KEY, user.getUsername())
+                    .apply();
+
+            updateUserStatusAndImage();
+            bottomNavigationView.setVisibility(View.VISIBLE);
+            Log.i(TAG, "onLoginSuccess: Loading TodoFragment and selecting nav_todo.");
+            loadFragment(new TodoFragment(), false);
+            bottomNavigationView.setSelectedItemId(R.id.nav_todo);
+            Toast.makeText(this, "Login Successful: " + user.getUsername(), Toast.LENGTH_SHORT).show();
+        } else {
+            Log.e(TAG, "onLoginSuccess: User with username '" + username + "' not found in database. Login failed.");
+            Toast.makeText(this, "Login failed: User data not found.", Toast.LENGTH_LONG).show();
+            UserSession.getInstance().logout();
+            updateUserStatusAndImage();
+            bottomNavigationView.setVisibility(View.GONE);
         }
     }
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.options_menu, menu);
-        Log.d(TAG, "Options menu inflated in MainActivity");
-        return true;
-    }
+    public void onRegisterSuccess(User user) {
+        Log.i(TAG, "onRegisterSuccess: User '" + user.getUsername() + "' registered and logged in.");
+        UserSession.getInstance().login(user);
 
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int itemId = item.getItemId();
-        Log.d(TAG, "MainActivity onOptionsItemSelected: Item selected: " + item.getTitle() + " (ID: " + itemId + ")");
+        // Also update SharedPreferences
+        getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(LOGGED_IN_USER_ID_KEY, user.getUsername())
+                .apply();
 
-        if (itemId == R.id.action_exit) { // Exit from MainActivity's OWN menu
-            Log.d(TAG, "Exit option selected from MainActivity menu. Calling onAppExitRequested() directly.");
-            onAppExitRequested(); // Call the centralized exit method
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    private void performLogout() {
-        Log.d(TAG, "Performing logout.");
-        UserSession.getInstance().logout();
-        Toast.makeText(this, "Logged out", Toast.LENGTH_SHORT).show();
         updateUserStatusAndImage();
-        // Potentially navigate or clear back stack
+        bottomNavigationView.setVisibility(View.VISIBLE);
+        Log.i(TAG, "onRegisterSuccess: Loading TodoFragment and selecting nav_todo.");
+        loadFragment(new TodoFragment(), false);
+        bottomNavigationView.setSelectedItemId(R.id.nav_todo);
+        Toast.makeText(this, "Registration Successful: " + user.getUsername(), Toast.LENGTH_SHORT).show();
     }
 
-    // ... All your other MainActivity methods (showLoginDialog, updateUserStatusAndImage, etc.) ...
+    // THIS IS THE NEWLY ADDED METHOD
+    @Override
+    public void onSwitchToLogin() {
+        Log.d(TAG, "onSwitchToLogin: User requested to switch from Register to Login.");
+        // Assuming RegisterDialog dismisses itself.
+        // Show the LoginDialog.
+        showLoginDialog("Login to your account");
+    }
 
+    @Override
+    public void onLogoutConfirmed() {
+        Log.i(TAG, "onLogoutConfirmed: Logging out user.");
+        UserSession.getInstance().logout();
+
+        // Also clear SharedPreferences
+        getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .remove(LOGGED_IN_USER_ID_KEY)
+                .apply();
+
+        updateUserStatusAndImage();
+        bottomNavigationView.setVisibility(View.GONE);
+
+        Log.i(TAG, "onLogoutConfirmed: Clearing fragment container.");
+        Fragment existingFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        if (existingFragment != null) {
+            getSupportFragmentManager().beginTransaction().remove(existingFragment).commitNow();
+        }
+        Toast.makeText(this, "Logged out", Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateUserStatusAndImage() {
+        UserSession session = UserSession.getInstance();
+        SharedPreferences prefs = getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE);
+        boolean showUsernamePref = prefs.getBoolean(KEY_SHOW_USERNAME, true);
+
+        if (session.isGuest() || session.getCurrentUser() == null) {
+            Log.d(TAG, "updateUserStatusAndImage: User is GUEST or currentUser is null. Setting guest UI.");
+            mainUsernameTextView.setText("Guest");
+            mainProfileImageView.setImageResource(R.drawable.ic_profile);
+        } else {
+            User currentUser = session.getCurrentUser();
+            if (showUsernamePref) {
+                Log.d(TAG, "updateUserStatusAndImage: User is " + currentUser.getUsername() + " (username shown). Setting user UI.");
+                mainUsernameTextView.setText(currentUser.getUsername());
+            } else {
+                Log.d(TAG, "updateUserStatusAndImage: User is " + currentUser.getUsername() + " (username hidden). Setting user UI to 'User'.");
+                mainUsernameTextView.setText("User");
+            }
+
+            if (currentUser.getProfileImagePath() != null && !currentUser.getProfileImagePath().isEmpty()) {
+                Log.d(TAG, "updateUserStatusAndImage: Loading profile image from URI: " + currentUser.getProfileImagePath());
+                mainProfileImageView.setImageURI(Uri.parse(currentUser.getProfileImagePath()));
+            } else {
+                Log.d(TAG, "updateUserStatusAndImage: No profile image path. Setting default profile image.");
+                mainProfileImageView.setImageResource(R.drawable.ic_profile);
+            }
+        }
+    }
+
+    private File createImageFile() throws IOException {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + "_";
+        File storageDir = getExternalFilesDir(null);
+        if (storageDir != null && !storageDir.exists()) {
+            if (!storageDir.mkdirs()) {
+                Log.e(TAG, "Failed to create directory for images: " + storageDir.getAbsolutePath());
+                throw new IOException("Failed to create directory for images: " + storageDir.getAbsolutePath());
+            }
+        }
+        File image = File.createTempFile(imageFileName, ".jpg", storageDir);
+        currentPhotoUri = FileProvider.getUriForFile(this, "com.example.assiproject.fileprovider", image);
+        Log.d(TAG, "createImageFile: Created image file at " + currentPhotoUri.toString());
+        return image;
+    }
+
+    public void showImageSourceDialog() {
+        final CharSequence[] options = {"Take Photo", "Choose from Gallery", "Cancel"};
+        androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this);
+        builder.setTitle("Set Profile Picture");
+        builder.setItems(options, (dialog, item) -> {
+            if (options[item].equals("Take Photo")) {
+                Log.d(TAG, "showImageSourceDialog: 'Take Photo' selected.");
+                Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                try {
+                    File photoFile = createImageFile();
+                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, currentPhotoUri);
+                    takePictureLauncher.launch(takePictureIntent);
+                } catch (IOException ex) {
+                    Log.e(TAG, "showImageSourceDialog: Error creating image file", ex);
+                    Toast.makeText(this, "Error creating image file", Toast.LENGTH_SHORT).show();
+                }
+            } else if (options[item].equals("Choose from Gallery")) {
+                Log.d(TAG, "showImageSourceDialog: 'Choose from Gallery' selected.");
+                selectPictureLauncher.launch("image/*");
+            } else if (options[item].equals("Cancel")) {
+                Log.d(TAG, "showImageSourceDialog: 'Cancel' selected.");
+                dialog.dismiss();
+            }
+        });
+        builder.show();
+    }
 }
