@@ -51,6 +51,24 @@ public class ProfileFragment extends Fragment {
 
     private ActivityResultLauncher<Intent> galleryLauncher;
     private ActivityResultLauncher<Intent> cameraLauncher;
+    private OnProfileFragmentInteractionListener mListener;
+
+    @Override
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
+        if (context instanceof OnProfileFragmentInteractionListener) {
+            mListener = (OnProfileFragmentInteractionListener) context;
+        } else {
+            throw new RuntimeException(context.toString()
+                    + " must implement OnProfileFragmentInteractionListener");
+        }
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+        mListener = null;
+    }
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -220,6 +238,10 @@ public class ProfileFragment extends Fragment {
         dbHelper.updateUser(currentUser); // Save to DB
         UserSession.getInstance().updateUserObject(currentUser); // Update session
 
+        if (mListener != null) {
+            mListener.onProfileImageUpdated();
+        }
+
         Glide.with(this)
                 .load(imageUri)
                 .placeholder(R.drawable.ic_profile)
@@ -236,8 +258,7 @@ public class ProfileFragment extends Fragment {
         loadUserProfile(); // Refresh user data when fragment becomes visible
     }
     public interface OnProfileFragmentInteractionListener {
-        void onAppExitRequested(); // Or whatever methods your interface needs
-        // Add other interaction methods here if necessary
+        void onAppExitRequested();
+        void onProfileImageUpdated();
     }
-    // private OnPro // Incomplete line from original code, left as is
 }

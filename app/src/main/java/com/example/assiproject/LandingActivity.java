@@ -151,6 +151,13 @@ public class LandingActivity extends AppCompatActivity implements ProfileFragmen
         Log.d(TAG, "finishAffinity() called. As a fallback, calling System.exit(0).");
         System.exit(0);
     }
+
+    @Override
+    public void onProfileImageUpdated() {
+        Log.d(TAG, "onProfileImageUpdated called. Refreshing UI components if needed.");
+        // LandingActivity doesn't have a header image in the layout I saw,
+        // but if it did, we would update it here.
+    }
     // --- END: Implementation of ProfileFragment's Listener ---
 
     // FragmentStateAdapter class
